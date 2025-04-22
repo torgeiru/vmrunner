@@ -42,7 +42,7 @@ pkgs.python3.pkgs.buildPythonPackage rec {
 
     for f in vmrunner/*.py; do
       echo Checking $f with pylint
-      pylint --persistent no "$f"
+      pylint --fail-under=9.8 --persistent no "$f"
     done
   '';
 

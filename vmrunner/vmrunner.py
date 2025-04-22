@@ -441,7 +441,7 @@ class qemu(hypervisor):
 
     def drive_arg(self, filename, device = "virtio", drive_format = "raw", media_type = "disk"):
         """ create the drive/device arguments based on the configuration """
-        names = {"virtio" : "virtio-blk",
+        names = {"virtio" : "virtio-blk-pci-non-transitional",
                  "virtio-scsi" : "virtio-scsi",
                  "ide"    : "piix3-ide",
                  "nvme"   : "nvme"}
@@ -453,14 +453,14 @@ class qemu(hypervisor):
                     + ",if=" + device
                     + ",media=" + media_type]
 
-        # Get device name if present, if not use the old name as default
+        # Get device name if present, if not use the old name as default 
         device = names.get(device, device)
 
         driveno = "drv" + str(self.m_drive_no)
         self.m_drive_no += 1
         return ["-drive", "file=" + filename + ",format=" + drive_format
                         + ",if=none" + ",media=" + media_type + ",id=" + driveno,
-                "-device",  device + ",drive=" + driveno +",serial=foo"]
+                "-device",  device + ",drive=" + driveno + ",serial=foo"]
 
     # -initrd "file1 arg=foo,file2"
     # This syntax is only available with multiboot.
@@ -574,7 +574,7 @@ class qemu(hypervisor):
 
         debug_args = []
         if debug:
-            debug_args = ["-s"]
+            debug_args = ["-s", "-S"]
 
         # multiboot - e.g. boot with '-kernel' and no bootloader
         if multiboot:
@@ -703,11 +703,9 @@ class qemu(hypervisor):
 
         command += kernel_args
         command += disk_args + debug_args + net_args + mem_arg + mod_args
-        command += vga_arg + trace_arg + pci_arg
-
-        #command_str = " ".join(command)
-        #command_str.encode('ascii','ignore')
-        #command = command_str.split(" ")
+        command += trace_arg + pci_arg + vga_arg
+        command += "-chardev socket,server=on,nowait,path=/tmp/console.sock,id=chardev0 -device virtio-serial,disable-legacy=on -device virtconsole,nr=0,chardev=chardev0".split(" ")
+        command += "-trace events=./events.txt -D ./log.txt".split(" ")
 
         info("Command:", " ".join(command))
 
@@ -770,8 +768,6 @@ class qemu(hypervisor):
             chars += char
 
         return chars
-
-
 
     def readline(self, filter_all_control_chars = False):
         if self._proc.poll():
