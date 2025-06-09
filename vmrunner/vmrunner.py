@@ -704,8 +704,9 @@ class qemu(hypervisor):
         command += kernel_args
         command += disk_args + debug_args + net_args + mem_arg + mod_args
         command += trace_arg + pci_arg + vga_arg
-        command += "-chardev socket,server=on,nowait,path=/tmp/console.sock,id=chardev0 -device virtio-serial,disable-legacy=on -device virtconsole,nr=0,chardev=chardev0".split(" ")
-        command += "-trace events=./events.txt -D ./log.txt".split(" ")
+        # command += "-chardev socket,server=on,nowait,path=/tmp/console.sock,id=chardev0 -device virtio-serial,disable-legacy=on -device virtconsole,nr=0,chardev=chardev0".split(" ")
+        # command += "-trace events=./events.txt -D ./log.txt".split(" ")
+        command += "-s -S".split(" ")
 
         info("Command:", " ".join(command))
 
