@@ -20,6 +20,7 @@ import threading
 import re
 import traceback
 import signal
+import time
 from enum import Enum
 import platform
 import psutil
@@ -332,7 +333,6 @@ class solo5(hypervisor):
             raise e
 
     def stop(self):
-
         signal_ = "-SIGTERM"
 
         # Don't try to kill twice
@@ -424,6 +424,7 @@ class qemu(hypervisor):
         self.m_drive_no = 0
 
         self._kvm_present = False # Set when KVM detected
+        self._virtiofsd_proc = None
 
         # TODO: Consider regex expecting a version number here
         self._bios_signature = "SeaBIOS (version"
@@ -515,6 +516,18 @@ class qemu(hypervisor):
 
         return ["-device", device,
                 "-netdev", netdev]
+
+    def init_virtiofs(self, socket, shared):
+        qemu_args = []
+        virtiofsd_args = ["virtiofsd", "--socket", socket, "--shared-dir", shared]
+        self._virtiofsd_proc = subprocess.Popen(virtiofsd_args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        time.sleep(0.1)
+        if self._virtiofsd_proc.poll():
+            raise Exception(f"VirtioFSD failed to start")
+
+        info("Successfully started VirtioFSD!")
+    
+        return qemu_args
 
     def kvm_present(self):
         """ returns true if KVM is present and available """
@@ -674,11 +687,22 @@ class qemu(hypervisor):
         if "vfio" in self._config:
             pci_arg = ["-device", "vfio-pci,host=" + self._config["vfio"]]
 
+        virtiofs_args = []
+        if "virtiofs" in self._config:
+            socket = "/tmp/virtiofsd.sock"
+            if "socket" in self._config["virtiofs"]:
+                socket = self._config["virtiofs"]["socket"]
+
+            if "shared" not in self._config["virtiofs"]:
+                raise Exception("Shared directory not specified for VirtioFS!")
+            shared = self._config["virtiofs"]["shared"]
+
+            virtiofs_args = self.init_virtiofs(socket, shared)
+
         # custom qemu binary/location
         qemu_binary = "qemu-system-x86_64"
         if "qemu" in self._config:
             qemu_binary = self._config["qemu"]
-
 
         command = []
         if self._allow_sudo:
@@ -703,12 +727,7 @@ class qemu(hypervisor):
 
         command += kernel_args
         command += disk_args + debug_args + net_args + mem_arg + mod_args
-        command += trace_arg + pci_arg + vga_arg
-        # command += "-chardev socket,server=on,nowait,path=/tmp/console.sock,id=chardev0 -device virtio-serial,disable-legacy=on -device virtconsole,nr=0,chardev=chardev0".split(" ")
-        # command += "-trace events=./events.txt -D ./log.txt".split(" ")
-        command += "-s -S".split(" ")
-
-        info("Command:", " ".join(command))
+        command += trace_arg + pci_arg + vga_arg + virtiofs_args
 
         try:
             self.start_process(command)
@@ -718,7 +737,6 @@ class qemu(hypervisor):
             raise e
 
     def stop(self):
-
         signal_ = "-SIGTERM"
 
         # Don't try to kill twice
@@ -749,6 +767,12 @@ class qemu(hypervisor):
 
             # Wait for termination (avoids the need to reset the terminal etc.)
             self.wait()
+
+        if self._virtiofsd_proc and self._virtiofsd_proc.poll() is None:
+            self._virtiofsd_proc.terminate()
+            time.sleep(0.1)
+            if self._virtiofsd_proc.poll():
+                info("Successfully terminated VirtioFSD!")
 
         return self
 
@@ -933,7 +957,6 @@ class vm:
             # Empty line - should only happen if process exited
             else:
                 pass
-
 
     def wait(self):
         """ wait """

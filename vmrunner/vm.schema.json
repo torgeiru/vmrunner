@@ -65,7 +65,6 @@
     },
 
     "net" : {
-
       "description" : "Network devices",
       "type" : "array",
       "items" : {
@@ -80,6 +79,17 @@
       }
     },
 
+    "virtiofs": {
+      "description" : "VirtioFS device",
+      "type" : "object",
+      "properties" : {
+        "socket" : { "type" : "string" },
+        "shared" : {
+          "description" : "Directory to be shared with guest", 
+          "type" : "string"
+        }
+      }
+    },
 
     "mem" : {
       "description" : "Amount of memory in megabytes",
