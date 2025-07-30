@@ -773,12 +773,6 @@ class qemu(hypervisor):
             # Wait for termination (avoids the need to reset the terminal etc.)
             self.wait()
 
-        if self._virtiofsd_proc and self._virtiofsd_proc.poll() is None:
-            self._virtiofsd_proc.terminate()
-            time.sleep(0.1)
-            if self._virtiofsd_proc.poll():
-                info("Successfully terminated VirtioFSD!")
-
         return self
 
     def wait(self):
