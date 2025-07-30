@@ -519,14 +519,19 @@ class qemu(hypervisor):
 
     def init_virtiofs(self, socket, shared):
         qemu_args = []
-        virtiofsd_args = ["virtiofsd", "--socket", socket, "--shared-dir", shared]
+        virtiofsd_args = ["virtiofsd", "--socket", socket, "--shared-dir", shared, "--sandbox", "none"]
         self._virtiofsd_proc = subprocess.Popen(virtiofsd_args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         time.sleep(0.1)
         if self._virtiofsd_proc.poll():
             raise Exception(f"VirtioFSD failed to start")
 
         info("Successfully started VirtioFSD!")
-    
+
+        qemu_args += ["-machine", "memory-backend=mem0"]
+        qemu_args += ["-chardev", f"socket,id=virtiofsd0,path={socket}"]
+        qemu_args += ["-device", "vhost-user-fs-pci,chardev=virtiofsd0,tag=virtiofs0"]
+        qemu_args += ["-object", f"memory-backend-memfd,id=mem0,size={self._config["mem"]}M,share=on"]
+
         return qemu_args
 
     def kvm_present(self):
