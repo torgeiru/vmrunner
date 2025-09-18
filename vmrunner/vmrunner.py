@@ -534,6 +534,12 @@ class qemu(hypervisor):
 
         return qemu_args
 
+    def init_pmem(self, image, size):
+        qemu_args = ["-object", f"memory-backend-file,id=pmemdev0,mem-path={image},size={size}M,share=on"]
+        qemu_args += ["-device", "virtio-pmem-pci,memdev=pmemdev0"]
+        return qemu_args
+
+
     def kvm_present(self):
         """ returns true if KVM is present and available """
         if not self._enable_kvm:
@@ -678,7 +684,7 @@ class qemu(hypervisor):
 
         mem_arg = []
         if "mem" in self._config:
-            mem_arg = ["-m", str(self._config["mem"])]
+            mem_arg = ["-m", f"size={self._config["mem"]},maxmem={64}G"]
 
         vga_arg = ["-nographic" ]
         if "vga" in self._config:
@@ -703,6 +709,18 @@ class qemu(hypervisor):
             shared = self._config["virtiofs"]["shared"]
 
             virtiofs_args = self.init_virtiofs(socket, shared)
+
+        virtiopmem_args = []
+        if "virtiopmem" in self._config:
+            if "image" not in self._config["virtiopmem"]:
+                raise Exception("Missing path to persistent image file")
+            image = self._config["virtiopmem"]["image"]
+
+            if "size" not in self._config["virtiopmem"]:
+                raise Exception("Missing persistent memory size")
+            size = self._config["virtiopmem"]["size"]
+
+            virtiopmem_args = self.init_pmem(image, size)
 
         # custom qemu binary/location
         qemu_binary = "qemu-system-x86_64"
@@ -732,7 +750,7 @@ class qemu(hypervisor):
 
         command += kernel_args
         command += disk_args + debug_args + net_args + mem_arg + mod_args
-        command += trace_arg + pci_arg + vga_arg + virtiofs_args
+        command += trace_arg + pci_arg + vga_arg + virtiofs_args + virtiopmem_args
 
         try:
             self.start_process(command)

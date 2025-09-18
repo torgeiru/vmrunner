@@ -79,7 +79,7 @@
       }
     },
 
-    "virtiofs": {
+    "virtiofs" : {
       "description" : "VirtioFS device",
       "type" : "object",
       "properties" : {
@@ -87,6 +87,21 @@
         "shared" : {
           "description" : "Directory to be shared with guest", 
           "type" : "string"
+        }
+      }
+    },
+
+    "virtiopmem": {
+      "description" : "VirtioPMEM device",
+      "type" : "object",
+      "properties" : {
+        "image" : { 
+          "description" : "Path to persistent image file",
+          "type" : "string" 
+        },
+        "size" : {
+          "description" : "Persistent memory size in megabytes",
+          "type" : "number"
         }
       }
     },
