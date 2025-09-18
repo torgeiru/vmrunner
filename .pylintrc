@@ -1,0 +1,3 @@
+[MESSAGES CONTROL]
+# r0917 = too many positional arguments
+disable=r0917
