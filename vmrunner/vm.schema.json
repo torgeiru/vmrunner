@@ -79,6 +79,17 @@
       }
     },
 
+    "virtiocon" : {
+      "description" : "VirtioCON device. Only used for testing Virtio queues for now",
+      "type" : "object",
+      "properties" : {
+        "path" : {
+          "description" : "The path to redirect the guest output",
+          "type" : "string"
+        }
+      }
+    },
+
     "virtiofs" : {
       "description" : "VirtioFS device",
       "type" : "object",

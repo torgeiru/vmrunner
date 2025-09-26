@@ -517,26 +517,36 @@ class qemu(hypervisor):
         return ["-device", device,
                 "-netdev", netdev]
 
-    def init_virtiofs(self, socket, shared):
-        qemu_args = []
-        virtiofsd_args = ["virtiofsd", "--socket", socket, "--shared-dir", shared, "--sandbox", "none"]
-        self._virtiofsd_proc = subprocess.Popen(virtiofsd_args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    def init_virtiocon(self, path):
+        """ creates a console device and redirects to the path given """
+        qemu_args = ["-device", "virtio-serial-pci,disable-legacy=on,id=virtio-serial0"]
+        qemu_args += ["-device", "virtserialport,chardev=char0"]
+        qemu_args += ["-chardev", f"file,id=char0,path={path}"]
+
+        return qemu_args
+
+    def init_virtiofs(self, socket, shared, mem):
+        """ initializes virtiofs by launching virtiofsd and creating a virtiofs device """
+        virtiofsd_args = ["virtiofsd", "--log-level", "debug", "--socket", socket, "--shared-dir", shared, "--sandbox", "none"]
+        self._virtiofsd_proc = subprocess.Popen(virtiofsd_args) # , stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
         time.sleep(0.1)
         if self._virtiofsd_proc.poll():
             raise Exception(f"VirtioFSD failed to start")
 
         info("Successfully started VirtioFSD!")
 
-        qemu_args += ["-machine", "memory-backend=mem0"]
+        qemu_args = ["-machine", "memory-backend=mem0"]
         qemu_args += ["-chardev", f"socket,id=virtiofsd0,path={socket}"]
         qemu_args += ["-device", "vhost-user-fs-pci,chardev=virtiofsd0,tag=virtiofs0"]
-        qemu_args += ["-object", f"memory-backend-memfd,id=mem0,size={self._config["mem"]}M,share=on"]
+        qemu_args += ["-object", f"memory-backend-memfd,id=mem0,size={mem}M,share=on"]
 
         return qemu_args
 
-    def init_pmem(self, image, size):
-        qemu_args = ["-object", f"memory-backend-file,id=pmemdev0,mem-path={image},size={size}M,share=on"]
+    def init_pmem(self, path, size):
+        """ creates a pmem device with image path as memory mapped backend """
+        qemu_args = ["-object", f"memory-backend-file,id=pmemdev0,mem-path={path},size={size}M,share=on"]
         qemu_args += ["-device", "virtio-pmem-pci,memdev=pmemdev0"]
+
         return qemu_args
 
 
@@ -598,7 +608,7 @@ class qemu(hypervisor):
 
         debug_args = []
         if debug:
-            debug_args = ["-s", "-S"]
+            debug_args.extend(["-s", "-S"])
 
         # multiboot - e.g. boot with '-kernel' and no bootloader
         if multiboot:
@@ -698,6 +708,12 @@ class qemu(hypervisor):
         if "vfio" in self._config:
             pci_arg = ["-device", "vfio-pci,host=" + self._config["vfio"]]
 
+        virtiocon_args = []
+        if "virtiocon" in self._config:
+            if "path" not in self._config["virtiocon"]:
+                raise Exception("Missing redirection path for guest output")
+            virtiocon_args = self.init_virtiocon(self._config["virtiocon"]["path"])
+
         virtiofs_args = []
         if "virtiofs" in self._config:
             socket = "/tmp/virtiofsd.sock"
@@ -708,7 +724,7 @@ class qemu(hypervisor):
                 raise Exception("Shared directory not specified for VirtioFS!")
             shared = self._config["virtiofs"]["shared"]
 
-            virtiofs_args = self.init_virtiofs(socket, shared)
+            virtiofs_args = self.init_virtiofs(socket, shared, self._config["mem"])
 
         virtiopmem_args = []
         if "virtiopmem" in self._config:
@@ -747,10 +763,10 @@ class qemu(hypervisor):
             if self.hvf_present():
                 command.extend(["-cpu","host"])
 
-
         command += kernel_args
         command += disk_args + debug_args + net_args + mem_arg + mod_args
-        command += trace_arg + pci_arg + vga_arg + virtiofs_args + virtiopmem_args
+        command += trace_arg + pci_arg + vga_arg + virtiocon_args + virtiofs_args
+        command += virtiopmem_args
 
         try:
             self.start_process(command)
