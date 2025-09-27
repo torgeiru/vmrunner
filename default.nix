@@ -1,4 +1,12 @@
-{ pkgs ? import <nixpkgs> {} }:
+{
+  pkgs ? import <nixpkgs> {},
+
+  virtiofsd_pinned ? import (fetchTarball {
+    name = "nixpkgs-pinned-for-virtiofsd";
+    url = "https://github.com/NixOS/nixpkgs/archive/13e8d35b7d6028b7198f8186bc0347c6abaa2701.tar.gz";
+    sha256 = "0nqbvgmm7pbpyd8ihg2bi62pxihj8r673bc9ll4qhi6xwlfqac5q";
+  }) {},
+ }:
 pkgs.python3.pkgs.buildPythonPackage rec {
   pname = "vmrunner";
   version = "0.16.0";
@@ -16,6 +24,7 @@ pkgs.python3.pkgs.buildPythonPackage rec {
     future
     jsonschema
     psutil
+    virtiofsd_pinned.virtiofsd
   ];
 
   create_bridge = ./vmrunner/bin/create_bridge.sh;
