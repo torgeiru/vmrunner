@@ -24,7 +24,6 @@ pkgs.python3.pkgs.buildPythonPackage rec {
     future
     jsonschema
     psutil
-    virtiofsd_pinned.virtiofsd
   ];
 
   create_bridge = ./vmrunner/bin/create_bridge.sh;
