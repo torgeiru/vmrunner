@@ -1,4 +1,9 @@
-{ pkgs ? import <nixpkgs> {} }:
+{
+  pkgs ? import <nixpkgs> {},
+  virtiofsd_pinned ? import (fetchTarball {
+    url = "https://github.com/NixOS/nixpkgs/archive/356befdc42ea173954be3e0cf0f241ff8d0a5674.tar.gz";
+  }) {},
+}:
 pkgs.python3.pkgs.buildPythonPackage rec {
   pname = "vmrunner";
   version = "0.16.0";
@@ -22,6 +27,8 @@ pkgs.python3.pkgs.buildPythonPackage rec {
 
   passthru = {
     inherit create_bridge;
+    virtiofsd = virtiofsd_pinned.virtiofsd;
+    qemu = virtiofsd_pinned.qemu;
   };
 
   meta = {

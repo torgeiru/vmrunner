@@ -3,12 +3,10 @@ let
   vmrunner = pkgs.callPackage ./default.nix {  };
 in
 pkgs.mkShell rec {
-    buildInputs = [
-      pkgs.qemu
-    ];
-
     packages = [
       vmrunner
+      vmrunner.qemu
+      vmrunner.virtiofsd
     ];
 
     # This binary must be added to the sudoers list to enable bridged networking
