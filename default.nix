@@ -31,6 +31,7 @@ pkgs.python3.pkgs.buildPythonPackage rec {
 
   passthru = {
     inherit create_bridge;
+    virtiofsd = virtiofsd_pinned.virtiofsd;
   };
 
   meta = {
