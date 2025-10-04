@@ -714,8 +714,6 @@ class qemu(hypervisor):
 
         virtiocon_args = []
         if "virtiocon" in self._config:
-            if "path" not in self._config["virtiocon"]:
-                raise Exception("Missing redirection path for guest output")
             virtiocon_args = self.init_virtiocon(self._config["virtiocon"]["path"])
 
         virtiofs_args = []
