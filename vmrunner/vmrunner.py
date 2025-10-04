@@ -724,8 +724,6 @@ class qemu(hypervisor):
             self._tmp_dirs.append(tmp_virtiofs_dir)
             socket_path = os.path.join(tmp_virtiofs_dir.name, "virtiofsd.sock")
 
-            if "shared" not in self._config["virtiofs"]:
-                raise Exception("Shared directory not specified for VirtioFS!")
             shared = self._config["virtiofs"]["shared"]
 
             virtiofs_args = self.init_virtiofs(socket_path, shared, self._config["mem"])
@@ -733,14 +731,8 @@ class qemu(hypervisor):
         virtiopmem_args = []
         if "virtiopmem" in self._config:
             for pmem_id, virtiopmem in enumerate(self._config["virtiopmem"]):
-                if "image" not in virtiopmem:
-                    raise Exception("Missing path to persistent image file")
                 image = virtiopmem["image"]
-
-                if "size" not in virtiopmem:
-                    raise Exception("Missing persistent memory size")
                 size = virtiopmem["size"]
-
                 virtiopmem_args += self.init_pmem(image, size, pmem_id)
 
         # custom qemu binary/location
