@@ -20,7 +20,7 @@ import threading
 import re
 import traceback
 import signal
-import time
+import tempfile
 from enum import Enum
 import platform
 import psutil
@@ -185,9 +185,9 @@ class hypervisor:
         self._config = config
         self._allow_sudo = False # must be explicitly turned on at boot.
         self._enable_kvm = False # must be explicitly turned on at boot.
-        self._sudo = False # Set to true if sudo is available
-        self._proc = None # A running subprocess
-        self._virtiofsd_proc = None
+        self._sudo = False       # Set to true if sudo is available
+        self._proc = None        # A running subprocess
+        self._tmp_dirs = []      # A list of tmp dirs created using tempfile module. Used for socket creation for automatic cleanup and garbage collection
 
     # pylint: disable-next=unused-argument
     def boot_in_hypervisor(self, multiboot=False, debug=False, kernel_args="", image_name="", allow_sudo = False, enable_kvm = False):
@@ -420,6 +420,7 @@ class qemu(hypervisor):
     def __init__(self, config):
         super().__init__(config)
         self._proc = None
+        self._virtiofsd_proc = None
         self._stopped = False
         self._sudo = False
         self._image_name = self._config if "image" in self._config else self.name() + " vm"
@@ -521,8 +522,8 @@ class qemu(hypervisor):
     def init_virtiocon(self, path):
         """ creates a console device and redirects to the path given """
         qemu_args = ["-device", "virtio-serial-pci,disable-legacy=on,id=virtio-serial0"]
-        qemu_args += ["-device", "virtserialport,chardev=char0"]
-        qemu_args += ["-chardev", f"file,id=char0,path={path}"]
+        qemu_args += ["-device", "virtserialport,chardev=virtiocon0"]
+        qemu_args += ["-chardev", f"file,id=virtiocon0,path={path}"]
 
         return qemu_args
 
@@ -531,23 +532,25 @@ class qemu(hypervisor):
         virtiofsd_args = ["virtiofsd", "--socket", socket, "--shared-dir", shared, "--sandbox", "none"]
         self._virtiofsd_proc = subprocess.Popen(virtiofsd_args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) # pylint: disable=consider-using-with
 
-        time.sleep(0.1)
         if self._virtiofsd_proc.poll():
             raise Exception("VirtioFSD failed to start")
 
         info("Successfully started VirtioFSD!")
 
+        while not os.path.exists(socket):
+            ...
+
         qemu_args = ["-machine", "memory-backend=mem0"]
         qemu_args += ["-chardev", f"socket,id=virtiofsd0,path={socket}"]
-        qemu_args += ["-device", "vhost-user-fs-pci,chardev=virtiofsd0,tag=virtiofs0"]
+        qemu_args += ["-device", "vhost-user-fs-pci,chardev=virtiofsd0,tag=vfs"]
         qemu_args += ["-object", f"memory-backend-memfd,id=mem0,size={mem}M,share=on"]
 
         return qemu_args
 
-    def init_pmem(self, path, size):
+    def init_pmem(self, path, size, pmem_id):
         """ creates a pmem device with image path as memory mapped backend """
-        qemu_args = ["-object", f"memory-backend-file,id=pmemdev0,mem-path={path},size={size}M,share=on"]
-        qemu_args += ["-device", "virtio-pmem-pci,memdev=pmemdev0"]
+        qemu_args = ["-object", f"memory-backend-file,id=pmemdev{pmem_id},mem-path={path},size={size}M,share=on"]
+        qemu_args += ["-device", f"virtio-pmem-pci,memdev=pmemdev{pmem_id}"]
 
         return qemu_args
 
@@ -695,7 +698,7 @@ class qemu(hypervisor):
 
         mem_arg = []
         if "mem" in self._config:
-            mem_arg = ["-m", f"size={self._config["mem"]},maxmem={64}G"]
+            mem_arg = ["-m", f"size={self._config["mem"]},maxmem=1000G"]
 
         vga_arg = ["-nographic" ]
         if "vga" in self._config:
@@ -717,27 +720,28 @@ class qemu(hypervisor):
 
         virtiofs_args = []
         if "virtiofs" in self._config:
-            socket = "/tmp/virtiofsd.sock"
-            if "socket" in self._config["virtiofs"]:
-                socket = self._config["virtiofs"]["socket"]
+            tmp_virtiofs_dir = tempfile.TemporaryDirectory(prefix="virtiofs-") # pylint: disable=consider-using-with
+            self._tmp_dirs.append(tmp_virtiofs_dir)
+            socket_path = os.path.join(tmp_virtiofs_dir.name, "virtiofsd.sock")
 
             if "shared" not in self._config["virtiofs"]:
                 raise Exception("Shared directory not specified for VirtioFS!")
             shared = self._config["virtiofs"]["shared"]
 
-            virtiofs_args = self.init_virtiofs(socket, shared, self._config["mem"])
+            virtiofs_args = self.init_virtiofs(socket_path, shared, self._config["mem"])
 
         virtiopmem_args = []
         if "virtiopmem" in self._config:
-            if "image" not in self._config["virtiopmem"]:
-                raise Exception("Missing path to persistent image file")
-            image = self._config["virtiopmem"]["image"]
+            for pmem_id, virtiopmem in enumerate(self._config["virtiopmem"]):
+                if "image" not in virtiopmem:
+                    raise Exception("Missing path to persistent image file")
+                image = virtiopmem["image"]
 
-            if "size" not in self._config["virtiopmem"]:
-                raise Exception("Missing persistent memory size")
-            size = self._config["virtiopmem"]["size"]
+                if "size" not in virtiopmem:
+                    raise Exception("Missing persistent memory size")
+                size = virtiopmem["size"]
 
-            virtiopmem_args = self.init_pmem(image, size)
+                virtiopmem_args += self.init_pmem(image, size, pmem_id)
 
         # custom qemu binary/location
         qemu_binary = "qemu-system-x86_64"
