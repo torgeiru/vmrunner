@@ -698,7 +698,7 @@ class qemu(hypervisor):
 
         mem_arg = []
         if "mem" in self._config:
-            mem_arg = ["-m", f"size={self._config["mem"]},maxmem=1000G"]
+            mem_arg = ["-m", f"size={self._config['mem']},maxmem=1000G"]
 
         vga_arg = ["-nographic" ]
         if "vga" in self._config:
