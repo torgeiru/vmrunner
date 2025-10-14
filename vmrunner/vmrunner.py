@@ -527,9 +527,9 @@ class qemu(hypervisor):
 
         return qemu_args
 
-    def init_virtiofs(self, socket, shared, mem):
+    def init_virtiofs(self, socket, virtiofsd, shared, cache_size, mem):
         """ initializes virtiofs by launching virtiofsd and creating a virtiofs device """
-        virtiofsd_args = ["virtiofsd", f"--socket-path={socket}", "-o", f"source={shared}"]
+        virtiofsd_args = [virtiofsd, "-o", "debug", "-o", f"vhost_user_socket={socket}", "-o", f"source={shared}"]
         self._virtiofsd_proc = subprocess.Popen(virtiofsd_args) # pylint: disable=consider-using-with
 
         if self._virtiofsd_proc.poll():
@@ -540,9 +540,9 @@ class qemu(hypervisor):
         while not os.path.exists(socket):
             ...
 
-        qemu_args = ["-machine", "memory-backend=mem0"]
-        qemu_args += ["-chardev", f"socket,id=virtiofsd0,path={socket}"]
-        qemu_args += ["-device", "vhost-user-fs-pci,chardev=virtiofsd0,tag=vfs"]
+        #qemu_args = ["-machine", "memory-backend=mem0"]
+        qemu_args = ["-chardev", f"socket,id=virtiofsd0,path={socket}"]
+        qemu_args += ["-device", f"vhost-user-fs-pci,cache-size={cache_size}M,chardev=virtiofsd0,tag=vfs"]
         qemu_args += ["-object", f"memory-backend-memfd,id=mem0,size={mem}M,share=on"]
 
         return qemu_args
@@ -717,14 +717,23 @@ class qemu(hypervisor):
             virtiocon_args = self.init_virtiocon(self._config["virtiocon"]["path"])
 
         virtiofs_args = []
-        if "virtiofs" in self._config:
-            tmp_virtiofs_dir = tempfile.TemporaryDirectory(prefix="virtiofs-") # pylint: disable=consider-using-with
+        if "virtiofs_dax" in self._config:
+            tmp_virtiofs_dir = tempfile.TemporaryDirectory(prefix="virtiofs_dax-") # pylint: disable=consider-using-with
             self._tmp_dirs.append(tmp_virtiofs_dir)
             socket_path = os.path.join(tmp_virtiofs_dir.name, "virtiofsd.sock")
 
-            shared = self._config["virtiofs"]["shared"]
+            shared = self._config["virtiofs_dax"]["shared"]
+            virtiofsd_path = self._config["virtiofs_dax"]["virtiofsd_path"]
+            cache_size = self._config["virtiofs_dax"]["cache_size"]
+            base_mem_size = self._config["mem"]
 
-            virtiofs_args = self.init_virtiofs(socket_path, shared, self._config["mem"])
+            virtiofs_args = self.init_virtiofs(
+                socket_path,
+                virtiofsd_path,
+                shared,
+                cache_size,
+                base_mem_size
+            )
 
         virtiopmem_args = []
         if "virtiopmem" in self._config:
