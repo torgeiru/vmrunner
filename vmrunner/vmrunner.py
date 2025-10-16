@@ -524,6 +524,7 @@ class qemu(hypervisor):
         qemu_args = ["-device", "virtio-serial-pci,disable-legacy=on,id=virtio-serial0"]
         qemu_args += ["-device", "virtserialport,chardev=virtiocon0"]
         qemu_args += ["-chardev", f"file,id=virtiocon0,path={path}"]
+        qemu_args += ["-d", "vhost_user,memory"]
 
         return qemu_args
 
@@ -540,10 +541,10 @@ class qemu(hypervisor):
         while not os.path.exists(socket):
             ...
 
-        #qemu_args = ["-machine", "memory-backend=mem0"]
-        qemu_args = ["-chardev", f"socket,id=virtiofsd0,path={socket}"]
-        qemu_args += ["-device", f"vhost-user-fs-pci,cache-size={cache_size}M,chardev=virtiofsd0,tag=vfs"]
-        qemu_args += ["-object", f"memory-backend-memfd,id=mem0,size={mem}M,share=on"]
+        print(cache_size)
+        qemu_args = ["-object", f"memory-backend-memfd,id=mem0,size={mem}M,share=on"]
+        qemu_args += ["-chardev", f"socket,id=virtiofsd0,path={socket}"]
+        qemu_args += ["-device", "vhost-user-fs-pci,chardev=virtiofsd0,tag=vfs"]
 
         return qemu_args
 
@@ -698,7 +699,7 @@ class qemu(hypervisor):
 
         mem_arg = []
         if "mem" in self._config:
-            mem_arg = ["-m", f"size={self._config['mem']},maxmem=1000G"]
+            mem_arg = ["-m", f"size={self._config['mem']}M,maxmem=1000G"]
 
         vga_arg = ["-nographic" ]
         if "vga" in self._config:
