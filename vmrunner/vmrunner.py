@@ -542,7 +542,8 @@ class qemu(hypervisor):
             ...
 
         print(cache_size)
-        qemu_args = ["-object", f"memory-backend-memfd,id=mem0,size={mem}M,share=on"]
+        qemu_args = ["-object", f"memory-backend-file,id=mem0,mem-path=/dev/shm,size={mem}M,share=on"]
+        qemu_args += ["-numa", "node,memdev=mem0"]
         qemu_args += ["-chardev", f"socket,id=virtiofsd0,path={socket}"]
         qemu_args += ["-device", "vhost-user-fs-pci,chardev=virtiofsd0,tag=vfs"]
 
