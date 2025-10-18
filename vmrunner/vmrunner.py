@@ -541,11 +541,10 @@ class qemu(hypervisor):
         while not os.path.exists(socket):
             ...
 
-        print(cache_size)
         qemu_args = ["-object", f"memory-backend-file,id=mem0,mem-path=/dev/shm,size={mem}M,share=on"]
         qemu_args += ["-numa", "node,memdev=mem0"]
         qemu_args += ["-chardev", f"socket,id=virtiofsd0,path={socket}"]
-        qemu_args += ["-device", "vhost-user-fs-pci,chardev=virtiofsd0,tag=vfs"]
+        qemu_args += ["-device", f"vhost-user-fs-pci,cache-size={cache_size}M,chardev=virtiofsd0,tag=vfs"]
 
         return qemu_args
 
