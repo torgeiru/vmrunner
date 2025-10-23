@@ -530,7 +530,7 @@ class qemu(hypervisor):
 
     def init_virtiofs(self, socket, virtiofsd, shared, cache_size, mem):
         """ initializes virtiofs by launching virtiofsd and creating a virtiofs device """
-        virtiofsd_args = [virtiofsd, "-o", "debug", "-o", f"vhost_user_socket={socket}", "-o", f"source={shared}"]
+        virtiofsd_args = [virtiofsd, "-o", f"vhost_user_socket={socket}", "-o", f"source={shared}"]
         self._virtiofsd_proc = subprocess.Popen(virtiofsd_args) # pylint: disable=consider-using-with
 
         if self._virtiofsd_proc.poll():
