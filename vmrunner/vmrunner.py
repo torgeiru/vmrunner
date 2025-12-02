@@ -532,7 +532,7 @@ class qemu(hypervisor):
         env = os.environ.copy()
         env['RUST_BACKTRACE'] = '1'
 
-        virtiofsd_args = ["virtiofsd", "--log-level", "debug", "--socket", socket, "--shared-dir", shared, "--sandbox", "none"]
+        virtiofsd_args = ["virtiofsd", "--log-level", "debug", "--allow-direct-io", "--cache", "never", "--socket", socket, "--shared-dir", shared, "--sandbox", "none"]
         self._virtiofsd_proc = subprocess.Popen(virtiofsd_args, env=env) # pylint: disable=consider-using-with
 
         if self._virtiofsd_proc.poll():
